@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScramProxy</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0e0e10;
+  --surface: #18181b;
+  --surface2: #27272a;
+  --border: #3f3f46;
+  --text: #fafafa;
+  --muted: #a1a1aa;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --danger: #f87171;
+  --success: #4ade80;
+  --radius: 8px;
+  --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+#logo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+}
+
+#logo span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+#url-form {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+#url-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#url-input:focus {
+  border-color: var(--accent);
+}
+
+#url-input::placeholder {
+  color: var(--muted);
+}
+
+#go-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 18px;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+#go-btn:hover { background: var(--accent-hover); }
+#go-btn:active { transform: scale(0.97); }
+#go-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+#status-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 4px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+  min-height: 26px;
+}
+
+#status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+#status-dot.ready { background: var(--success); }
+#status-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
+#status-dot.error { background: var(--danger); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+#status-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#iframe-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+#proxy-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  background: #fff;
+}
+
+#landing {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 2rem;
+}
+
+#landing .big {
+  font-size: 48px;
+  line-height: 1;
+  user-select: none;
+}
+
+#landing .hint {
+  color: var(--border);
+  font-size: 11px;
+}
+
+#overlay-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(14,14,16,0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--muted);
+  gap: 8px;
+  backdrop-filter: blur(2px);
+}
+
+#overlay-loading.active { display: flex; }
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="logo">scram<span>proxy</span></div>
+  <form id="url-form">
+    <input id="url-input" type="text" placeholder="https://example.com" autocomplete="off" spellcheck="false">
+    <button id="go-btn" type="submit">Go</button>
+  </form>
+</div>
+
+<div id="status-bar">
+  <div id="status-dot"></div>
+  <span id="status-text">Initializing wisp transport...</span>
+</div>
+
+<div id="iframe-wrap">
+  <div id="landing">
+    <div class="big">🌐</div>
+    <div>Enter a URL above to begin</div>
+    <div class="hint">Routes through epoxy/wisp — bypasses CORS &amp; X-Frame-Options</div>
+  </div>
+  <div id="overlay-loading">
+    <div class="spinner"></div>
+    <span id="overlay-text">Loading...</span>
+  </div>
+  <iframe id="proxy-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" style="display:none"></iframe>
+</div>
+
+<script>
+(function() {
+  const WISP_LIST_URL = 'https://cdn.jsdelivr.net/gh/lotsacookie/kstuff@main/Assets/json/wss.json';
+  const EPOXY_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-tls/+esm';
+  const REQUEST_TIMEOUT = 30000;
+
+  const urlInput = document.getElementById('url-input');
+  const goBtn = document.getElementById('go-btn');
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const landing = document.getElementById('landing');
+  const overlayLoading = document.getElementById('overlay-loading');
+  const overlayText = document.getElementById('overlay-text');
+  const frame = document.getElementById('proxy-frame');
+
+  let swReady = false;
+  let epoxyClient = null;
+  let epoxyBindings = null;
+  let wispUrls = [];
+  let wispIndex = 0;
+  let currentUrl = null;
+  let loadGeneration = 0;
+
+  function setStatus(state, msg) {
+    statusDot.className = state;
+    statusText.textContent = msg;
+  }
+
+  function base64ToText(b64) {
+    const binary = atob(b64.trim());
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function extractWispUrls(decoded) {
+    if (Array.isArray(decoded)) return decoded.map(x => (x||'').toString().trim()).filter(x => x.startsWith('wss://') || x.startsWith('ws://'));
+    if (decoded && typeof decoded === 'object') {
+      for (const v of Object.values(decoded)) { const f = extractWispUrls(v); if (f.length) return f; }
+    }
+    return [];
+  }
+
+  async function loadWispList() {
+    setStatus('loading', 'Fetching wisp server list...');
+    const r = await fetch(WISP_LIST_URL + '?nocache=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('wisp list HTTP ' + r.status);
+    const outer = await r.json();
+    let b64 = null;
+    if (Array.isArray(outer)) b64 = outer.find(x => typeof x === 'string' && x.trim());
+    else if (typeof outer === 'string') b64 = outer;
+    if (!b64) throw new Error('no base64 in wisp json');
+    const decoded = JSON.parse(base64ToText(b64));
+    const list = extractWispUrls(decoded);
+    if (!list.length) throw new Error('no wss:// urls found');
+    return list;
+  }
+
+  async function getEpoxyBindings() {
+    if (epoxyBindings) return epoxyBindings;
+    setStatus('loading', 'Loading epoxy transport...');
+    const mod = await import(EPOXY_MODULE_URL);
+    if (typeof mod.default === 'function') await mod.default();
+    if (!mod.EpoxyClient || !mod.EpoxyClientOptions) throw new Error('epoxy bindings missing');
+    epoxyBindings = mod;
+    return mod;
+  }
+
+  async function getClient() {
+    if (epoxyClient) return epoxyClient;
+    const server = wispUrls[wispIndex % wispUrls.length];
+    setStatus('loading', 'Connecting to ' + server + '...');
+    const { EpoxyClient, EpoxyClientOptions } = await getEpoxyBindings();
+    const opts = new EpoxyClientOptions();
+    opts.user_agent = navigator.userAgent;
+    epoxyClient = await new EpoxyClient(server, opts);
+    return epoxyClient;
+  }
+
+  function resetClient() {
+    const old = epoxyClient;
+    epoxyClient = null;
+    wispIndex = (wispIndex + 1) % Math.max(1, wispUrls.length);
+    if (old) setTimeout(() => { try { old.free && old.free(); } catch(e){} }, 10000);
+  }
+
+  const withTimeout = (p, ms) => new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error('timeout after ' + ms + 'ms')), ms);
+    Promise.resolve(p).then(v => { clearTimeout(t); res(v); }, e => { clearTimeout(t); rej(e); });
+  });
+
+  async function wispFetch(url, opts) {
+    const client = await withTimeout(getClient(), 12000);
+    try {
+      const resp = await withTimeout(client.fetch(url, opts || {}), REQUEST_TIMEOUT);
+      return resp;
+    } catch(e) {
+      if (/websocket|closed|reset|panic|wasm/i.test(e.message||'')) resetClient();
+      throw e;
+    }
+  }
+
+  function encodeProxyUrl(url) {
+    return '/proxy/' + encodeURIComponent(url);
+  }
+
+  function rewriteUrl(url, base) {
+    try {
+      if (!url || url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('javascript:') || url.startsWith('#')) return url;
+      if (url.startsWith('/proxy/')) return url;
+      return encodeProxyUrl(new URL(url, base).href);
+    } catch(e) { return url; }
+  }
+
+  function rewriteHtml(html, base) {
+    let out = html;
+    out = out.replace(/(<(?:script|link|img|iframe|source|input|form|video|audio|track|embed|object)[^>]+\s(?:src|href|action|data)=["'])([^"']+)(["'])/gi, (m, pre, url, post) => pre + rewriteUrl(url, base) + post);
+    out = out.replace(/url\(\s*(['"]?)([^)'"]+)\1\s*\)/g, (m, q, u) => 'url(' + q + rewriteUrl(u.trim(), base) + q + ')');
+    out = out.replace(/<head([^>]*)>/i, (m, attrs) => '<head' + attrs + `>
+<script>
+(function(){
+  const _open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    try {
+      const abs = new URL(url, location.href).href;
+      if (!abs.startsWith(location.origin + '/proxy/')) {
+        url = '/proxy/' + encodeURIComponent(abs);
+      }
+    } catch(e) {}
+    return _open.call(this, method, url, ...rest);
+  };
+  const _fetch = window.fetch;
+  window.fetch = function(input, init) {
+    try {
+      let url = typeof input === 'string' ? input : input.url;
+      const abs = new URL(url, location.href).href;
+      if (!abs.startsWith(location.origin + '/proxy/')) {
+        url = '/proxy/' + encodeURIComponent(abs);
+        input = typeof input === 'string' ? url : new Request(url, input);
+      }
+    } catch(e) {}
+    return _fetch.call(window, input, init);
+  };
+})();
+<\/script>`);
+    return out;
+  }
+
+  async function loadUrl(rawUrl) {
+    let url;
+    try {
+      if (!/^https?:\/\//i.test(rawUrl)) rawUrl = 'https://' + rawUrl;
+      url = new URL(rawUrl);
+    } catch(e) {
+      setStatus('error', 'Invalid URL');
+      return;
+    }
+
+    const gen = ++loadGeneration;
+    currentUrl = url.href;
+    urlInput.value = url.href;
+    landing.style.display = 'none';
+    overlayLoading.classList.add('active');
+    overlayText.textContent = 'Fetching ' + url.hostname + '...';
+    goBtn.disabled = true;
+    setStatus('loading', 'Fetching ' + url.href);
+    frame.style.display = 'block';
+
+    const stale = () => gen !== loadGeneration;
+
+    try {
+      const resp = await withTimeout(wispFetch(url.href, { method: 'GET' }), REQUEST_TIMEOUT);
+      if (stale()) return;
+
+      const contentType = resp.headers ? (resp.headers.get ? resp.headers.get('content-type') : '') || '' : '';
+      let html = await resp.text();
+      if (stale()) return;
+
+      const base = url.href.replace(/[^\/]*$/, '');
+      if (!/<base\s/i.test(html)) {
+        if (/<head[^>]*>/i.test(html)) {
+          html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${base}">`);
+        } else {
+          html = `<base href="${base}">` + html;
+        }
+      }
+
+      html = rewriteHtml(html, url.href);
+
+      const doc = frame.contentDocument;
+      if (!doc) throw new Error('iframe document unavailable');
+
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      setStatus('ready', url.href);
+      overlayLoading.classList.remove('active');
+    } catch(e) {
+      if (stale()) return;
+      setStatus('error', 'Error: ' + e.message);
+      overlayLoading.classList.remove('active');
+      const doc = frame.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write('<html><body style="font-family:monospace;padding:2rem;background:#0e0e10;color:#f87171"><h2>Proxy Error</h2><p>' + e.message + '</p></body></html>');
+        doc.close();
+      }
+    } finally {
+      if (!stale()) goBtn.disabled = false;
+    }
+  }
+
+  document.getElementById('url-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const val = urlInput.value.trim();
+    if (val) loadUrl(val);
+  });
+
+  async function init() {
+    try {
+      wispUrls = await loadWispList();
+      setStatus('loading', 'Connecting to wisp: ' + (wispUrls[0] || '?'));
+      await getClient();
+      setStatus('ready', 'Ready — ' + wispUrls[wispIndex % wispUrls.length]);
+
+      if ('serviceWorker' in navigator) {
+        try {
+          const reg = await navigator.serviceWorker.register('./sw.js');
+          await new Promise(res => {
+            if (reg.active) { swReady = true; return res(); }
+            const w = reg.installing || reg.waiting;
+            if (w) w.addEventListener('statechange', function() { if (this.state === 'activated') { swReady = true; res(); } });
+            else reg.addEventListener('updatefound', () => {
+              reg.installing.addEventListener('statechange', function() { if (this.state === 'activated') { swReady = true; res(); } });
+            });
+            setTimeout(res, 3000);
+          });
+          console.log('[proxy] service worker registered');
+        } catch(e) {
+          console.warn('[proxy] SW registration failed (sub-resource rewrite via SW disabled):', e.message);
+        }
+      }
+    } catch(e) {
+      setStatus('error', 'Init failed: ' + e.message);
+      console.error('[proxy] init error:', e);
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
