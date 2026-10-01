@@ -7,10 +7,13 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  height: 100%;
+}
+
 :root {
   --bg: #0e0e10;
   --surface: #18181b;
-  --surface2: #27272a;
   --border: #3f3f46;
   --text: #fafafa;
   --muted: #a1a1aa;
@@ -27,9 +30,9 @@ body {
   color: var(--text);
   font-family: var(--mono);
   font-size: 13px;
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 #header {
@@ -39,7 +42,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 
 #logo {
@@ -111,7 +114,7 @@ body {
   gap: 8px;
   font-size: 11px;
   color: var(--muted);
-  flex-shrink: 0;
+  flex: 0 0 auto;
   min-height: 26px;
 }
 
@@ -136,7 +139,8 @@ body {
 #status-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #iframe-wrap {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
   overflow: hidden;
 }
@@ -220,9 +224,9 @@ body {
 
 <div id="iframe-wrap">
   <div id="landing">
-    <div class="big">🌐</div>
+    <div class="big">&#127760;</div>
     <div>Enter a URL above to begin</div>
-    <div class="hint">Routes through epoxy/wisp — bypasses CORS &amp; X-Frame-Options</div>
+    <div class="hint">Routes through epoxy/wisp, no service worker required</div>
   </div>
   <div id="overlay-loading">
     <div class="spinner"></div>
@@ -236,6 +240,7 @@ body {
   const WISP_LIST_URL = 'https://cdn.jsdelivr.net/gh/lotsacookie/kstuff@main/Assets/json/wss.json';
   const EPOXY_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-tls/+esm';
   const REQUEST_TIMEOUT = 30000;
+  const MAX_REDIRECTS = 10;
 
   const urlInput = document.getElementById('url-input');
   const goBtn = document.getElementById('go-btn');
@@ -246,12 +251,10 @@ body {
   const overlayText = document.getElementById('overlay-text');
   const frame = document.getElementById('proxy-frame');
 
-  let swReady = false;
   let epoxyClient = null;
   let epoxyBindings = null;
   let wispUrls = [];
   let wispIndex = 0;
-  let currentUrl = null;
   let loadGeneration = 0;
 
   function setStatus(state, msg) {
@@ -316,17 +319,19 @@ body {
     if (old) setTimeout(() => { try { old.free && old.free(); } catch(e){} }, 10000);
   }
 
-  const withTimeout = (p, ms) => new Promise((res, rej) => {
-    const t = setTimeout(() => rej(new Error('timeout after ' + ms + 'ms')), ms);
-    Promise.resolve(p).then(v => { clearTimeout(t); res(v); }, e => { clearTimeout(t); rej(e); });
-  });
+  function withTimeout(p, ms) {
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('timeout after ' + ms + 'ms')), ms);
+      Promise.resolve(p).then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+    });
+  }
 
-  async function rawFetch(url, opts) {
+  async function wispRawFetch(url, opts) {
     const client = await withTimeout(getClient(), 12000);
     try {
       return await withTimeout(client.fetch(url, opts || {}), REQUEST_TIMEOUT);
     } catch(e) {
-      if (/websocket|closed|reset|panic|wasm/i.test(e.message||'')) resetClient();
+      if (/websocket|closed|reset|panic|wasm|not ready/i.test(e.message || '')) resetClient();
       throw e;
     }
   }
@@ -334,8 +339,8 @@ body {
   async function wispFetchFollowingRedirects(url, opts) {
     let currentUrl = url;
     let currentOpts = opts || {};
-    for (let i = 0; i < 10; i++) {
-      const resp = await rawFetch(currentUrl, currentOpts);
+    for (let i = 0; i < MAX_REDIRECTS; i++) {
+      const resp = await wispRawFetch(currentUrl, currentOpts);
       const status = resp.status;
       if (status >= 300 && status < 400) {
         const loc = resp.headers.get('location');
@@ -352,96 +357,341 @@ body {
     throw new Error('too many redirects');
   }
 
-  function encodeProxyUrl(url) {
-    return '/proxy/' + encodeURIComponent(url);
+  async function wispFetchRaw(url, opts) {
+    const { resp, finalUrl } = await wispFetchFollowingRedirects(url, opts);
+    const buffer = await resp.arrayBuffer();
+    const headers = [];
+    resp.headers.forEach((v, k) => headers.push([k, v]));
+    return { status: resp.status, statusText: resp.statusText || '', headers, buffer, finalUrl };
   }
 
-  function rewriteUrl(url, base) {
+  function getHeader(headers, name) {
+    name = name.toLowerCase();
+    for (const [k, v] of headers) if (k.toLowerCase() === name) return v;
+    return '';
+  }
+
+  function absUrl(url, base) {
+    try { return new URL(url, base).href; } catch(e) { return null; }
+  }
+
+  function isSkippable(url) {
+    return !url || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(url.trim());
+  }
+
+  async function fetchAsBlobUrl(url, base) {
+    const target = absUrl(url, base);
+    if (!target) return url;
     try {
-      if (!url) return url;
-      const t = url.trim();
-      if (/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(t)) return url;
-      if (t.startsWith('/proxy/')) return url;
-      return encodeProxyUrl(new URL(t, base).href);
-    } catch(e) { return url; }
+      const r = await wispFetchRaw(target, { method: 'GET' });
+      const type = getHeader(r.headers, 'content-type') || 'application/octet-stream';
+      const blob = new Blob([r.buffer], { type });
+      return URL.createObjectURL(blob);
+    } catch(e) {
+      return url;
+    }
   }
 
-  function rewriteSrcset(value, base) {
-    return value.split(',').map(part => {
-      const trimmed = part.trim();
-      const m = trimmed.match(/^(\S+)(\s+.*)?$/);
-      if (!m) return part;
-      return rewriteUrl(m[1], base) + (m[2] || '');
-    }).join(', ');
-  }
-
-  function injectedScript(origin) {
-    return '<script>' +
-      '(function(){' +
-      'var ORIGIN = ' + JSON.stringify(origin) + ';' +
-      'function toProxy(u) {' +
-      'try {' +
-      'if (!u) return u;' +
-      'var t = u.trim();' +
-      'if (/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(t)) return u;' +
-      'if (t.indexOf("/proxy/") === 0) return u;' +
-      'var abs = new URL(t, document.baseURI).href;' +
-      'return ORIGIN + "/proxy/" + encodeURIComponent(abs);' +
-      '} catch(e) { return u; }' +
-      '}' +
-      'var _xopen = XMLHttpRequest.prototype.open;' +
-      'XMLHttpRequest.prototype.open = function(method, url) {' +
-      'var args = Array.prototype.slice.call(arguments);' +
-      'args[1] = toProxy(url);' +
-      'return _xopen.apply(this, args);' +
-      '};' +
-      'var _fetch = window.fetch;' +
-      'window.fetch = function(input, init) {' +
-      'try {' +
-      'var url = typeof input === "string" ? input : input.url;' +
-      'var proxied = toProxy(url);' +
-      'input = typeof input === "string" ? proxied : new Request(proxied, input);' +
-      '} catch(e) {}' +
-      'return _fetch.call(window, input, init);' +
-      '};' +
-      'var _winOpen = window.open;' +
-      'window.open = function(url) {' +
-      'var args = Array.prototype.slice.call(arguments);' +
-      'args[0] = toProxy(url);' +
-      'return _winOpen.apply(window, args);' +
-      '};' +
-      'document.addEventListener("click", function(e) {' +
-      'var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;' +
-      'if (!a) return;' +
-      'var href = a.getAttribute("href");' +
-      'if (!href || /^(javascript:|#|mailto:|tel:)/i.test(href)) return;' +
-      'var proxied = toProxy(href);' +
-      'if (proxied !== href) {' +
-      'e.preventDefault();' +
-      'window.top.location.href = proxied;' +
-      '}' +
-      '}, true);' +
-      'document.addEventListener("submit", function(e) {' +
-      'var f = e.target;' +
-      'if (!f || f.tagName !== "FORM") return;' +
-      'var action = f.getAttribute("action") || document.baseURI;' +
-      'f.setAttribute("action", toProxy(action));' +
-      '}, true);' +
-      '})();' +
-      '<\/script>';
-  }
-
-  function rewriteHtml(html, base) {
-    let out = html;
-    out = out.replace(/(<[a-z][a-z0-9]*\b[^>]*\ssrcset=["'])([^"']+)(["'])/gi, (m, pre, val, post) => pre + rewriteSrcset(val, base) + post);
-    out = out.replace(/(<[a-z][a-z0-9]*\b[^>]*\s(?:href|src|action|formaction|poster|data)=["'])([^"']+)(["'])/gi, (m, pre, url, post) => pre + rewriteUrl(url, base) + post);
-    out = out.replace(/(<meta[^>]+http-equiv=["']refresh["'][^>]+content=["'][^;]*;\s*url=)([^"']+)(["'])/gi, (m, pre, url, post) => pre + rewriteUrl(url, base) + post);
-    out = out.replace(/url\(\s*(['"]?)([^)'"]+)\1\s*\)/g, (m, q, u) => 'url(' + q + rewriteUrl(u.trim(), base) + q + ')');
-    out = out.replace(/<head([^>]*)>/i, (m, attrs) => '<head' + attrs + '>' + injectedScript(location.origin));
+  async function processCss(cssText, base) {
+    const urls = new Set();
+    const urlRe = /url\(\s*(['"]?)([^)'"]+)\1\s*\)/g;
+    const importRe = /@import\s+(['"])([^'"]+)\1/g;
+    let m;
+    while ((m = urlRe.exec(cssText))) { if (!isSkippable(m[2])) urls.add(m[2]); }
+    while ((m = importRe.exec(cssText))) { if (!isSkippable(m[2])) urls.add(m[2]); }
+    const map = new Map();
+    await Promise.all([...urls].map(async u => {
+      const target = absUrl(u, base);
+      if (!target) return;
+      try {
+        const r = await wispFetchRaw(target, { method: 'GET' });
+        const ct = (getHeader(r.headers, 'content-type') || '').toLowerCase();
+        let bytesForBlob = r.buffer;
+        let type = ct || 'application/octet-stream';
+        if (ct.includes('text/css')) {
+          const text = new TextDecoder('utf-8').decode(r.buffer);
+          const rewritten = await processCss(text, target);
+          bytesForBlob = new TextEncoder().encode(rewritten);
+          type = 'text/css';
+        }
+        const blob = new Blob([bytesForBlob], { type });
+        map.set(u, URL.createObjectURL(blob));
+      } catch(e) {}
+    }));
+    let out = cssText.replace(urlRe, (m0, q, u) => map.has(u) ? ('url(' + q + map.get(u) + q + ')') : m0);
+    out = out.replace(importRe, (m0, q, u) => map.has(u) ? ('@import ' + q + map.get(u) + q) : m0);
     return out;
   }
 
-  async function loadUrl(rawUrl) {
+  function buildRuntimeScript() {
+    return '(function(){' +
+      'function toAbs(u){try{return new URL(u, document.baseURI).href;}catch(e){return u;}}' +
+      'function skip(u){return !u || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(u.trim());}' +
+      'async function bridgeFetch(url, opts){return await window.top.__scramFetch(url, opts || {});}' +
+      'async function toBlobUrl(url){' +
+        'if (skip(url)) return url;' +
+        'var u = toAbs(url);' +
+        'try{' +
+          'var r = await bridgeFetch(u, { method: "GET" });' +
+          'var type = "application/octet-stream";' +
+          'for (var i=0;i<r.headers.length;i++){ if (r.headers[i][0].toLowerCase()==="content-type") type = r.headers[i][1]; }' +
+          'var blob = new Blob([r.buffer], { type: type });' +
+          'return URL.createObjectURL(blob);' +
+        '}catch(e){ return url; }' +
+      '}' +
+      'var _fetch = window.fetch;' +
+      'window.fetch = async function(input, init){' +
+        'var url = typeof input === "string" ? input : (input && input.url);' +
+        'var method = (init && init.method) || (input && input.method) || "GET";' +
+        'var body = (init && init.body) || null;' +
+        'var abs = toAbs(url);' +
+        'var r = await bridgeFetch(abs, { method: method, headers: (init && init.headers) || {}, body: body });' +
+        'var headers = new Headers();' +
+        'for (var i=0;i<r.headers.length;i++){ try{ headers.append(r.headers[i][0], r.headers[i][1]); }catch(e){} }' +
+        'return new Response(r.buffer, { status: r.status, statusText: r.statusText, headers: headers });' +
+      '};' +
+      'function XHRShim(){ this._listeners = {}; this.readyState = 0; this.status = 0; this.response = null; this.responseText = ""; this.responseURL = ""; }' +
+      'XHRShim.prototype.open = function(method, url){ this._method = method; this._url = toAbs(url); };' +
+      'XHRShim.prototype.setRequestHeader = function(k,v){ this._headers = this._headers || {}; this._headers[k] = v; };' +
+      'XHRShim.prototype.addEventListener = function(type, fn){ this._listeners[type] = this._listeners[type] || []; this._listeners[type].push(fn); };' +
+      'XHRShim.prototype._fire = function(type){ var self=this; var fns = (this["on"+type] ? [this["on"+type]] : []).concat(this._listeners[type]||[]); fns.forEach(function(fn){ try{ fn.call(self, {target:self}); }catch(e){} }); };' +
+      'XHRShim.prototype.send = async function(body){' +
+        'try{' +
+          'var r = await bridgeFetch(this._url, { method: this._method, headers: this._headers||{}, body: body });' +
+          'this.status = r.status;' +
+          'this.responseURL = r.finalUrl || this._url;' +
+          'this.response = r.buffer;' +
+          'try{ this.responseText = new TextDecoder("utf-8").decode(r.buffer); }catch(e){ this.responseText=""; }' +
+          'this.readyState = 4;' +
+          'this._fire("readystatechange");' +
+          'this._fire("load");' +
+        '}catch(e){' +
+          'this.readyState = 4; this.status = 0;' +
+          'this._fire("readystatechange");' +
+          'this._fire("error");' +
+        '}' +
+      '};' +
+      'XHRShim.prototype.getAllResponseHeaders = function(){ return ""; };' +
+      'XHRShim.prototype.getResponseHeader = function(){ return null; };' +
+      'window.XMLHttpRequest = XHRShim;' +
+      'window.open = function(url){ var abs = toAbs(url); window.top.__scramNavigate(abs); return null; };' +
+      'async function convertAttr(el, attr){' +
+        'var val = el.getAttribute(attr);' +
+        'if (!val || skip(val)) return;' +
+        'if (el.tagName === "IFRAME" && attr === "src"){' +
+          'var abs = toAbs(val);' +
+          'try{' +
+            'var html = await window.top.__scramFetchText(abs);' +
+            'var rewritten = await window.top.__scramProcessHtml(html, abs);' +
+            'var blob = new Blob([rewritten], { type: "text/html" });' +
+            'el.setAttribute("src", URL.createObjectURL(blob));' +
+          '}catch(e){}' +
+          'return;' +
+        '}' +
+        'var blobUrl = await toBlobUrl(val);' +
+        'el.setAttribute(attr, blobUrl);' +
+      '}' +
+      'var _setAttribute = Element.prototype.setAttribute;' +
+      'Element.prototype.setAttribute = function(name, value){' +
+        'var n = String(name).toLowerCase();' +
+        'if ((n==="src"||n==="href"||n==="poster"||n==="data") && value && !skip(value) && String(value).indexOf("blob:")!==0){' +
+          'var tag = this.tagName;' +
+          'if (tag === "A" || tag === "FORM") return _setAttribute.call(this, name, value);' +
+          '_setAttribute.call(this, name, value);' +
+          'convertAttr(this, name);' +
+          'return;' +
+        '}' +
+        'return _setAttribute.call(this, name, value);' +
+      '};' +
+      '[["src", [window.HTMLImageElement, window.HTMLScriptElement, window.HTMLSourceElement, window.HTMLMediaElement, window.HTMLTrackElement, window.HTMLEmbedElement]], ["href", [window.HTMLLinkElement]]].forEach(function(pair){' +
+        'var prop = pair[0];' +
+        'pair[1].forEach(function(Ctor){' +
+          'if (!Ctor || !Ctor.prototype) return;' +
+          'var desc = Object.getOwnPropertyDescriptor(Ctor.prototype, prop);' +
+          'if (!desc || !desc.set) return;' +
+          'Object.defineProperty(Ctor.prototype, prop, {' +
+            'configurable: true, get: desc.get,' +
+            'set: function(value){' +
+              'if (!value || skip(value) || String(value).indexOf("blob:")===0) return desc.set.call(this, value);' +
+              'desc.set.call(this, value);' +
+              'toBlobUrl(value).then(function(bu){ desc.set.call(this, bu); }.bind(this));' +
+            '}' +
+          '});' +
+        '});' +
+      '});' +
+      'var iframeDesc = Object.getOwnPropertyDescriptor(window.HTMLIFrameElement.prototype, "src");' +
+      'if (iframeDesc && iframeDesc.set){' +
+        'Object.defineProperty(window.HTMLIFrameElement.prototype, "src", {' +
+          'configurable: true, get: iframeDesc.get,' +
+          'set: function(value){' +
+            'if (!value || skip(value) || String(value).indexOf("blob:")===0) return iframeDesc.set.call(this, value);' +
+            'var abs = toAbs(value);' +
+            'var self = this;' +
+            'window.top.__scramFetchText(abs).then(function(html){ return window.top.__scramProcessHtml(html, abs); }).then(function(rewritten){' +
+              'var blob = new Blob([rewritten], { type: "text/html" });' +
+              'iframeDesc.set.call(self, URL.createObjectURL(blob));' +
+            '}).catch(function(){ iframeDesc.set.call(self, value); });' +
+          '}' +
+        '});' +
+      '}' +
+      'document.addEventListener("click", function(e){' +
+        'var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;' +
+        'if (!a) return;' +
+        'var href = a.getAttribute("href");' +
+        'if (!href || /^(javascript:|#|mailto:|tel:)/i.test(href)) return;' +
+        'e.preventDefault();' +
+        'window.top.__scramNavigate(toAbs(href));' +
+      '}, true);' +
+      'document.addEventListener("submit", function(e){' +
+        'var f = e.target;' +
+        'if (!f || f.tagName !== "FORM") return;' +
+        'e.preventDefault();' +
+        'var action = toAbs(f.getAttribute("action") || document.baseURI);' +
+        'var method = (f.getAttribute("method") || "GET").toUpperCase();' +
+        'if (method === "GET"){' +
+          'var params = new URLSearchParams(new FormData(f));' +
+          'var url = action + (action.indexOf("?")>=0?"&":"?") + params.toString();' +
+          'window.top.__scramNavigate(url);' +
+        '} else {' +
+          'var fd = new FormData(f);' +
+          'window.top.__scramNavigate(action, method, fd);' +
+        '}' +
+      '}, true);' +
+    '})();';
+  }
+
+  async function processHtml(html, baseUrl) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    doc.querySelectorAll('base').forEach(b => b.remove());
+    const baseEl = doc.createElement('base');
+    baseEl.setAttribute('href', new URL('.', baseUrl).href);
+    if (doc.head) doc.head.insertBefore(baseEl, doc.head.firstChild);
+
+    doc.querySelectorAll('meta[http-equiv]').forEach(meta => {
+      if ((meta.getAttribute('http-equiv') || '').toLowerCase() === 'refresh') {
+        const content = meta.getAttribute('content') || '';
+        const m = content.match(/^\s*(\d+)\s*;\s*url=(.+)$/i);
+        if (m) {
+          const delay = parseInt(m[1], 10) * 1000;
+          const target = absUrl(m[2].trim().replace(/^['"]|['"]$/g, ''), baseUrl);
+          meta.remove();
+          if (target && doc.head) {
+            const s = doc.createElement('script');
+            s.textContent = 'setTimeout(function(){ window.top.__scramNavigate(' + JSON.stringify(target) + '); }, ' + delay + ');';
+            doc.head.appendChild(s);
+          }
+        }
+      }
+    });
+
+    const fetchJobs = [];
+
+    doc.querySelectorAll('img[src], source[src], video[src], audio[src], track[src], embed[src]').forEach(el => {
+      const val = el.getAttribute('src');
+      if (isSkippable(val)) return;
+      fetchJobs.push(fetchAsBlobUrl(val, baseUrl).then(bu => el.setAttribute('src', bu)));
+    });
+
+    doc.querySelectorAll('object[data]').forEach(el => {
+      const val = el.getAttribute('data');
+      if (isSkippable(val)) return;
+      fetchJobs.push(fetchAsBlobUrl(val, baseUrl).then(bu => el.setAttribute('data', bu)));
+    });
+
+    doc.querySelectorAll('[srcset]').forEach(el => {
+      const val = el.getAttribute('srcset');
+      if (!val) return;
+      const parts = val.split(',').map(p => p.trim());
+      fetchJobs.push(Promise.all(parts.map(async p => {
+        const m = p.match(/^(\S+)(\s+.*)?$/);
+        if (!m) return p;
+        const bu = await fetchAsBlobUrl(m[1], baseUrl);
+        return bu + (m[2] || '');
+      })).then(rewritten => el.setAttribute('srcset', rewritten.join(', '))));
+    });
+
+    doc.querySelectorAll('script[src]').forEach(el => {
+      const val = el.getAttribute('src');
+      if (isSkippable(val)) return;
+      fetchJobs.push(fetchAsBlobUrl(val, baseUrl).then(bu => el.setAttribute('src', bu)));
+    });
+
+    doc.querySelectorAll('link[href]').forEach(el => {
+      const val = el.getAttribute('href');
+      const rel = (el.getAttribute('rel') || '').toLowerCase();
+      if (isSkippable(val)) return;
+      if (rel.includes('stylesheet')) {
+        fetchJobs.push((async () => {
+          const target = absUrl(val, baseUrl);
+          try {
+            const r = await wispFetchRaw(target, { method: 'GET' });
+            const text = new TextDecoder('utf-8').decode(r.buffer);
+            const rewritten = await processCss(text, target);
+            const blob = new Blob([rewritten], { type: 'text/css' });
+            el.setAttribute('href', URL.createObjectURL(blob));
+          } catch(e) {}
+        })());
+      } else {
+        fetchJobs.push(fetchAsBlobUrl(val, baseUrl).then(bu => el.setAttribute('href', bu)));
+      }
+    });
+
+    doc.querySelectorAll('style').forEach(el => {
+      fetchJobs.push(processCss(el.textContent || '', baseUrl).then(rewritten => { el.textContent = rewritten; }));
+    });
+
+    doc.querySelectorAll('[style]').forEach(el => {
+      const val = el.getAttribute('style');
+      if (val && val.includes('url(')) {
+        fetchJobs.push(processCss(val, baseUrl).then(rewritten => el.setAttribute('style', rewritten)));
+      }
+    });
+
+    doc.querySelectorAll('iframe[src]').forEach(el => {
+      const val = el.getAttribute('src');
+      if (isSkippable(val)) return;
+      fetchJobs.push((async () => {
+        const target = absUrl(val, baseUrl);
+        try {
+          const r = await wispFetchRaw(target, { method: 'GET' });
+          const nestedHtml = new TextDecoder('utf-8').decode(r.buffer);
+          const rewritten = await processHtml(nestedHtml, r.finalUrl);
+          const blob = new Blob([rewritten], { type: 'text/html' });
+          el.setAttribute('src', URL.createObjectURL(blob));
+        } catch(e) {}
+      })());
+    });
+
+    await Promise.all(fetchJobs);
+
+    const script = doc.createElement('script');
+    script.textContent = buildRuntimeScript();
+    if (doc.head) doc.head.appendChild(script);
+    else doc.documentElement.appendChild(script);
+
+    return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
+  }
+
+  window.__scramFetch = async function(url, opts) {
+    return await wispFetchRaw(url, opts || {});
+  };
+
+  window.__scramFetchText = async function(url) {
+    const r = await wispFetchRaw(url, { method: 'GET' });
+    return new TextDecoder('utf-8').decode(r.buffer);
+  };
+
+  window.__scramProcessHtml = async function(html, baseUrl) {
+    return await processHtml(html, baseUrl);
+  };
+
+  window.__scramNavigate = async function(url, method, body) {
+    await loadUrl(url, method, body);
+  };
+
+  async function loadUrl(rawUrl, method, body) {
     let url;
     try {
       if (!/^https?:\/\//i.test(rawUrl)) rawUrl = 'https://' + rawUrl;
@@ -452,7 +702,6 @@ body {
     }
 
     const gen = ++loadGeneration;
-    currentUrl = url.href;
     urlInput.value = url.href;
     landing.style.display = 'none';
     overlayLoading.classList.add('active');
@@ -464,31 +713,26 @@ body {
     const stale = () => gen !== loadGeneration;
 
     try {
-      const { resp, finalUrl } = await withTimeout(wispFetchFollowingRedirects(url.href, { method: 'GET' }), REQUEST_TIMEOUT);
+      const opts = { method: method || 'GET' };
+      if (body) opts.body = body;
+      const r = await withTimeout(wispFetchRaw(url.href, opts), REQUEST_TIMEOUT * 2);
       if (stale()) return;
 
-      let html = await resp.text();
+      const html = new TextDecoder('utf-8').decode(r.buffer);
       if (stale()) return;
 
-      html = rewriteHtml(html, finalUrl);
-
-      const dirBase = new URL('.', finalUrl).href;
-      if (!/<base\s/i.test(html)) {
-        if (/<head[^>]*>/i.test(html)) {
-          html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${dirBase}">`);
-        } else {
-          html = `<base href="${dirBase}">` + html;
-        }
-      }
+      setStatus('loading', 'Rewriting resources for ' + url.hostname + '...');
+      const rewritten = await processHtml(html, r.finalUrl);
+      if (stale()) return;
 
       const doc = frame.contentDocument;
       if (!doc) throw new Error('iframe document unavailable');
 
       doc.open();
-      doc.write(html);
+      doc.write(rewritten);
       doc.close();
 
-      setStatus('ready', finalUrl);
+      setStatus('ready', r.finalUrl);
       overlayLoading.classList.remove('active');
     } catch(e) {
       if (stale()) return;
@@ -511,325 +755,12 @@ body {
     if (val) loadUrl(val);
   });
 
-  const SW_SOURCE = `
-const PROXY_PREFIX = '/proxy/';
-const WISP_LIST_URL = 'https://cdn.jsdelivr.net/gh/lotsacookie/kstuff@main/Assets/json/wss.json';
-const EPOXY_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-tls/+esm';
-const MAX_REDIRECTS = 10;
-const REQUEST_TIMEOUT = 30000;
-
-let epoxyBindings = null;
-let epoxyClient = null;
-let wispUrls = [];
-let wispIndex = 0;
-
-function base64ToText(b64) {
-  const binary = atob(b64.trim());
-  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-  return new TextDecoder('utf-8').decode(bytes);
-}
-
-function extractWispUrls(decoded) {
-  if (Array.isArray(decoded)) {
-    return decoded.map(x => (x || '').toString().trim()).filter(x => x.startsWith('wss://') || x.startsWith('ws://'));
-  }
-  if (decoded && typeof decoded === 'object') {
-    for (const value of Object.values(decoded)) {
-      const found = extractWispUrls(value);
-      if (found.length > 0) return found;
-    }
-  }
-  return [];
-}
-
-async function loadWispList() {
-  try {
-    const r = await fetch(WISP_LIST_URL + '?nocache=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const outer = await r.json();
-    let b64 = null;
-    if (Array.isArray(outer)) b64 = outer.find(x => typeof x === 'string' && x.trim());
-    else if (typeof outer === 'string') b64 = outer;
-    if (!b64) throw new Error('no base64 in wisp json');
-    const decoded = JSON.parse(base64ToText(b64));
-    const list = extractWispUrls(decoded);
-    if (!list.length) throw new Error('no ws urls found');
-    return list;
-  } catch (e) {
-    console.error('[sw] wisp list load failed:', e);
-    return [];
-  }
-}
-
-async function getEpoxyBindings() {
-  if (epoxyBindings) return epoxyBindings;
-  const mod = await import(EPOXY_MODULE_URL);
-  if (typeof mod.default === 'function') await mod.default();
-  if (!mod.EpoxyClient || !mod.EpoxyClientOptions) throw new Error('epoxy bindings unavailable');
-  epoxyBindings = mod;
-  return mod;
-}
-
-async function getClient() {
-  if (epoxyClient) return epoxyClient;
-  if (!wispUrls.length) {
-    wispUrls = await loadWispList();
-    if (!wispUrls.length) throw new Error('no wisp servers');
-  }
-  const { EpoxyClient, EpoxyClientOptions } = await getEpoxyBindings();
-  const opts = new EpoxyClientOptions();
-  opts.user_agent = 'Mozilla/5.0 (compatible; ScramProxy/1.0)';
-  const server = wispUrls[wispIndex % wispUrls.length];
-  epoxyClient = await new EpoxyClient(server, opts);
-  return epoxyClient;
-}
-
-function resetClient() {
-  const old = epoxyClient;
-  epoxyClient = null;
-  wispIndex = (wispIndex + 1) % Math.max(1, wispUrls.length);
-  if (old) setTimeout(() => { try { old.free && old.free(); } catch (e) {} }, 10000);
-}
-
-function withTimeout(p, ms) {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('timeout')), ms);
-    Promise.resolve(p).then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
-  });
-}
-
-async function rawFetch(url, opts) {
-  const client = await withTimeout(getClient(), 15000);
-  try {
-    return await withTimeout(client.fetch(url, opts), REQUEST_TIMEOUT);
-  } catch (e) {
-    if (/websocket|closed|reset|panic|wasm|not ready/i.test(e.message || '')) resetClient();
-    throw e;
-  }
-}
-
-async function fetchFollowingRedirects(url, opts) {
-  let currentUrl = url;
-  let currentOpts = opts;
-  for (let i = 0; i < MAX_REDIRECTS; i++) {
-    const resp = await rawFetch(currentUrl, currentOpts);
-    const status = resp.status;
-    if (status >= 300 && status < 400) {
-      const loc = resp.headers.get('location');
-      if (!loc) return { resp, finalUrl: currentUrl };
-      const nextUrl = new URL(loc, currentUrl).href;
-      if (status === 303 || ((status === 301 || status === 302) && currentOpts.method !== 'GET' && currentOpts.method !== 'HEAD')) {
-        currentOpts = { ...currentOpts, method: 'GET', body: null };
-      }
-      currentUrl = nextUrl;
-      continue;
-    }
-    return { resp, finalUrl: currentUrl };
-  }
-  throw new Error('too many redirects');
-}
-
-function encodeProxyUrl(url) {
-  return PROXY_PREFIX + encodeURIComponent(url);
-}
-
-function rewriteUrl(url, base) {
-  try {
-    if (!url) return url;
-    const trimmed = url.trim();
-    if (/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(trimmed)) return url;
-    if (trimmed.startsWith('/proxy/')) return url;
-    const abs = new URL(trimmed, base).href;
-    return encodeProxyUrl(abs);
-  } catch (e) {
-    return url;
-  }
-}
-
-function rewriteSrcset(value, base) {
-  return value.split(',').map(part => {
-    const trimmed = part.trim();
-    const m = trimmed.match(/^(\\S+)(\\s+.*)?$/);
-    if (!m) return part;
-    return rewriteUrl(m[1], base) + (m[2] || '');
-  }).join(', ');
-}
-
-function injectedScript(origin) {
-  return '<script>' +
-    '(function(){' +
-    'var ORIGIN = ' + JSON.stringify(origin) + ';' +
-    'function toProxy(u) {' +
-    'try {' +
-    'if (!u) return u;' +
-    'var t = u.trim();' +
-    'if (/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(t)) return u;' +
-    'if (t.indexOf("/proxy/") === 0) return u;' +
-    'var abs = new URL(t, document.baseURI).href;' +
-    'return ORIGIN + "/proxy/" + encodeURIComponent(abs);' +
-    '} catch(e) { return u; }' +
-    '}' +
-    'var _xopen = XMLHttpRequest.prototype.open;' +
-    'XMLHttpRequest.prototype.open = function(method, url) {' +
-    'var args = Array.prototype.slice.call(arguments);' +
-    'args[1] = toProxy(url);' +
-    'return _xopen.apply(this, args);' +
-    '};' +
-    'var _fetch = window.fetch;' +
-    'window.fetch = function(input, init) {' +
-    'try {' +
-    'var url = typeof input === "string" ? input : input.url;' +
-    'var proxied = toProxy(url);' +
-    'input = typeof input === "string" ? proxied : new Request(proxied, input);' +
-    '} catch(e) {}' +
-    'return _fetch.call(window, input, init);' +
-    '};' +
-    'var _winOpen = window.open;' +
-    'window.open = function(url) {' +
-    'var args = Array.prototype.slice.call(arguments);' +
-    'args[0] = toProxy(url);' +
-    'return _winOpen.apply(window, args);' +
-    '};' +
-    'document.addEventListener("click", function(e) {' +
-    'var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;' +
-    'if (!a) return;' +
-    'var href = a.getAttribute("href");' +
-    'if (!href || /^(javascript:|#|mailto:|tel:)/i.test(href)) return;' +
-    'var proxied = toProxy(href);' +
-    'if (proxied !== href) {' +
-    'e.preventDefault();' +
-    'window.top.location.href = proxied;' +
-    '}' +
-    '}, true);' +
-    'document.addEventListener("submit", function(e) {' +
-    'var f = e.target;' +
-    'if (!f || f.tagName !== "FORM") return;' +
-    'var action = f.getAttribute("action") || document.baseURI;' +
-    'f.setAttribute("action", toProxy(action));' +
-    '}, true);' +
-    '})();' +
-    '<\\/script>';
-}
-
-function rewriteContent(text, base, isHtml, isCss) {
-  if (isCss) {
-    return text.replace(/url\\(\\s*(['"]?)([^)'"]+)\\1\\s*\\)/g, (m, q, u) => 'url(' + q + rewriteUrl(u.trim(), base) + q + ')')
-      .replace(/@import\\s+(['"])([^'"]+)\\1/g, (m, q, u) => '@import ' + q + rewriteUrl(u, base) + q);
-  }
-
-  if (isHtml) {
-    let out = text;
-    out = out.replace(/(<[a-z][a-z0-9]*\\b[^>]*\\ssrcset=["'])([^"']+)(["'])/gi, (m, pre, val, post) => pre + rewriteSrcset(val, base) + post);
-    out = out.replace(/(<[a-z][a-z0-9]*\\b[^>]*\\s(?:href|src|action|formaction|poster|data)=["'])([^"']+)(["'])/gi, (m, pre, url, post) => pre + rewriteUrl(url, base) + post);
-    out = out.replace(/(<meta[^>]+http-equiv=["']refresh["'][^>]+content=["'][^;]*;\\s*url=)([^"']+)(["'])/gi, (m, pre, url, post) => pre + rewriteUrl(url, base) + post);
-    out = out.replace(/url\\(\\s*(['"]?)([^)'"]+)\\1\\s*\\)/g, (m, q, u) => 'url(' + q + rewriteUrl(u.trim(), base) + q + ')');
-    const dirBase = new URL('.', base).href;
-    out = out.replace(/<head([^>]*)>/i, (m, attrs) => '<head' + attrs + '><base href="' + dirBase + '">' + injectedScript(self.location.origin));
-    return out;
-  }
-
-  return text;
-}
-
-self.addEventListener('install', e => { e.waitUntil(self.skipWaiting()); });
-
-self.addEventListener('activate', e => {
-  e.waitUntil(self.clients.claim());
-  loadWispList().then(urls => { wispUrls = urls; });
-  getClient().catch(e => console.warn('[sw] initial client setup:', e.message));
-});
-
-async function handleProxyRequest(targetUrl, originalRequest) {
-  const headers = {};
-  for (const [k, v] of originalRequest.headers.entries()) {
-    const kl = k.toLowerCase();
-    if (kl === 'host' || kl === 'origin' || kl === 'referer' || kl === 'cookie') continue;
-    headers[k] = v;
-  }
-  headers['Origin'] = new URL(targetUrl).origin;
-
-  let body = null;
-  if (originalRequest.method !== 'GET' && originalRequest.method !== 'HEAD') {
-    try { body = await originalRequest.arrayBuffer(); } catch (e) {}
-  }
-
-  const { resp, finalUrl } = await fetchFollowingRedirects(targetUrl, { method: originalRequest.method, headers, body });
-
-  const contentType = resp.headers.get('content-type') || '';
-  const isHtml = contentType.includes('text/html');
-  const isCss = contentType.includes('text/css');
-
-  const respHeaders = new Headers();
-  respHeaders.set('Access-Control-Allow-Origin', '*');
-  respHeaders.set('Access-Control-Allow-Methods', '*');
-  for (const [k, v] of resp.headers.entries()) {
-    const kl = k.toLowerCase();
-    if (kl === 'content-security-policy' || kl === 'x-frame-options' || kl === 'content-encoding' || kl === 'set-cookie' || kl === 'location') continue;
-    respHeaders.set(k, v);
-  }
-
-  if (isHtml || isCss) {
-    const text = await resp.text();
-    const rewritten = rewriteContent(text, finalUrl, isHtml, isCss);
-    return new Response(rewritten, { status: resp.status, headers: respHeaders });
-  }
-
-  const blob = await resp.blob();
-  return new Response(blob, { status: resp.status, headers: respHeaders });
-}
-
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  if (!url.pathname.startsWith(PROXY_PREFIX)) return;
-
-  const encoded = url.pathname.slice(PROXY_PREFIX.length) + url.search;
-  let targetUrl;
-  try {
-    targetUrl = decodeURIComponent(encoded);
-    new URL(targetUrl);
-  } catch (err) {
-    e.respondWith(new Response('Bad proxy URL', { status: 400 }));
-    return;
-  }
-
-  e.respondWith(
-    handleProxyRequest(targetUrl, e.request).catch(err => {
-      console.error('[sw] proxy error:', err);
-      return new Response(
-        '<h2 style="font-family:monospace;padding:2rem">Proxy error: ' + err.message + '</h2>',
-        { status: 502, headers: { 'content-type': 'text/html' } }
-      );
-    })
-  );
-});
-`;
-
   async function init() {
     try {
       wispUrls = await loadWispList();
       setStatus('loading', 'Connecting to wisp: ' + (wispUrls[0] || '?'));
       await getClient();
       setStatus('ready', 'Ready — ' + wispUrls[wispIndex % wispUrls.length]);
-
-      if ('serviceWorker' in navigator) {
-        try {
-          const swBlob = new Blob([SW_SOURCE], { type: 'text/javascript' });
-          const swUrl = URL.createObjectURL(swBlob);
-          const reg = await navigator.serviceWorker.register(swUrl, { scope: './' });
-          await new Promise(res => {
-            if (reg.active) { swReady = true; return res(); }
-            const w = reg.installing || reg.waiting;
-            if (w) w.addEventListener('statechange', function() { if (this.state === 'activated') { swReady = true; res(); } });
-            else reg.addEventListener('updatefound', () => {
-              reg.installing.addEventListener('statechange', function() { if (this.state === 'activated') { swReady = true; res(); } });
-            });
-            setTimeout(res, 3000);
-          });
-          console.log('[proxy] service worker registered');
-        } catch(e) {
-          console.warn('[proxy] SW registration failed (sub-resource rewrite via SW disabled):', e.message);
-        }
-      }
     } catch(e) {
       setStatus('error', 'Init failed: ' + e.message);
       console.error('[proxy] init error:', e);
