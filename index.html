@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scramini</title>
+<title>ScramProxy</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -136,9 +136,28 @@ body {
   <iframe id="proxy-frame" width="100%" style="display:none"></iframe>
 </div>
 
-<script src="https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/scramjet.all.js"></script>
+<script>
+window.addEventListener('error', function(e) {
+  console.error('[proxy] window error:', e.message, e.filename, e.lineno, e.error);
+  var d = document.getElementById('status-dot'), t = document.getElementById('status-text');
+  if (d && t) { d.className = 'error'; t.textContent = 'JS error: ' + e.message + ' (' + (e.filename || '?').split('/').pop() + ':' + e.lineno + ')'; }
+});
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('[proxy] unhandled rejection:', e.reason);
+  var d = document.getElementById('status-dot'), t = document.getElementById('status-text');
+  var msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason);
+  if (d && t) { d.className = 'error'; t.textContent = 'Unhandled error: ' + msg; }
+});
+</script>
+<script>
+console.log('[proxy] loading scramjet.all.js classic script...');
+</script>
+<script src="https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/scramjet.all.js"
+        onload="console.log('[proxy] scramjet.all.js loaded OK')"
+        onerror="console.error('[proxy] scramjet.all.js FAILED to load'); document.getElementById('status-dot').className='error'; document.getElementById('status-text').textContent='scramjet.all.js failed to load (network/CDN/CSP blocked)';">
+</script>
 <script type="module">
-import * as BareMux from "https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/index.mjs";
+console.log('[proxy] module script starting');
 
 const WISP_LIST_URL = "https://cdn.jsdelivr.net/gh/lotsacookie/kstuff@main/Assets/json/wss.json";
 const FALLBACK_WISP = "wss://gointospace.app/wisp/";
@@ -203,11 +222,28 @@ async function getWispUrl() {
 let scramjet;
 
 async function init() {
+  console.log('[proxy] init() starting');
+
+  if (!('serviceWorker' in navigator)) {
+    setStatus('error', 'This browser/context has no navigator.serviceWorker (are you on file:// or http, not https/localhost?)');
+    console.error('[proxy] no navigator.serviceWorker available');
+    return;
+  }
+
   try {
     setStatus('loading', 'Loading wisp server list...');
+    console.log('[proxy] step: getWispUrl');
     const wispUrl = await getWispUrl();
+    console.log('[proxy] wisp url:', wispUrl);
+
+    setStatus('loading', 'Checking scramjet.all.js loaded...');
+    console.log('[proxy] step: check $scramjetLoadController');
+    if (typeof $scramjetLoadController !== 'function') {
+      throw new Error('$scramjetLoadController is not defined — scramjet.all.js did not load/execute');
+    }
 
     setStatus('loading', 'Setting up Scramjet controller...');
+    console.log('[proxy] step: new ScramjetController');
     const { ScramjetController } = $scramjetLoadController();
     scramjet = new ScramjetController({
       files: {
@@ -216,18 +252,35 @@ async function init() {
         sync: "https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/scramjet.sync.js"
       }
     });
+    console.log('[proxy] step: scramjet.init()');
     await scramjet.init();
+    console.log('[proxy] scramjet.init() done');
 
     setStatus('loading', 'Registering service worker...');
+    console.log('[proxy] step: register SW');
     const swBlob = new Blob([SW_SOURCE], { type: 'text/javascript' });
     const swUrl = URL.createObjectURL(swBlob);
-    await navigator.serviceWorker.register(swUrl, { scope: './' });
+    const reg = await navigator.serviceWorker.register(swUrl, { scope: './' });
+    console.log('[proxy] SW registered:', reg);
+
+    setStatus('loading', 'Loading bare-mux client...');
+    console.log('[proxy] step: dynamic import bare-mux');
+    let BareMux;
+    try {
+      BareMux = await import("https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/index.mjs");
+    } catch (impErr) {
+      throw new Error('failed to import bare-mux module (tinyjet/index.mjs): ' + impErr.message);
+    }
+    console.log('[proxy] bare-mux module loaded:', BareMux);
 
     setStatus('loading', 'Connecting bare-mux transport...');
+    console.log('[proxy] step: BareMuxConnection + setTransport');
     const connection = new BareMux.BareMuxConnection(BARE_WORKER_URL);
     await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport/dist/index.mjs", [{ wisp: wispUrl }]);
+    console.log('[proxy] transport set');
 
     setStatus('ready', 'Ready — ' + wispUrl);
+    console.log('[proxy] init() complete');
   } catch (e) {
     setStatus('error', 'Init failed: ' + e.message);
     console.error('[proxy] init error:', e);
@@ -266,7 +319,11 @@ document.getElementById('url-form').addEventListener('submit', e => {
   if (val) loadUrl(val);
 });
 
-init();
+console.log('[proxy] about to call init()');
+init().catch(e => {
+  console.error('[proxy] init() promise rejected:', e);
+  setStatus('error', 'init() rejected: ' + e.message);
+});
 </script>
 </body>
 </html>
