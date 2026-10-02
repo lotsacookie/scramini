@@ -3,13 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ScramProxy</title>
+<title>Scramini</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
-  height: 100%;
-}
+html, body { height: 100%; }
 
 :root {
   --bg: #0e0e10;
@@ -45,29 +43,13 @@ body {
   flex: 0 0 auto;
 }
 
-#logo {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--accent);
-  letter-spacing: -0.5px;
-  white-space: nowrap;
-}
+#logo { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; white-space: nowrap; }
+#logo span { color: var(--muted); font-weight: 400; }
 
-#logo span {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-#url-form {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
+#url-form { display: flex; gap: 8px; flex: 1; min-width: 0; }
 
 #url-input {
-  flex: 1;
-  min-width: 0;
+  flex: 1; min-width: 0;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -78,14 +60,8 @@ body {
   outline: none;
   transition: border-color 0.15s;
 }
-
-#url-input:focus {
-  border-color: var(--accent);
-}
-
-#url-input::placeholder {
-  color: var(--muted);
-}
+#url-input:focus { border-color: var(--accent); }
+#url-input::placeholder { color: var(--muted); }
 
 #go-btn {
   background: var(--accent);
@@ -100,7 +76,6 @@ body {
   transition: background 0.15s;
   white-space: nowrap;
 }
-
 #go-btn:hover { background: var(--accent-hover); }
 #go-btn:active { transform: scale(0.97); }
 #go-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -117,94 +92,24 @@ body {
   flex: 0 0 auto;
   min-height: 26px;
 }
-
-#status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--muted);
-  flex-shrink: 0;
-  transition: background 0.3s;
-}
-
+#status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.3s; }
 #status-dot.ready { background: var(--success); }
 #status-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
 #status-dot.error { background: var(--danger); }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 #status-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-#iframe-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
-  position: relative;
-  overflow: hidden;
-}
+#iframe-wrap { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; }
 
-#proxy-frame {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-  background: #fff;
-}
+#proxy-frame { width: 100%; height: 100%; border: none; display: block; background: #fff; }
 
 #landing {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  background: var(--bg);
-  color: var(--muted);
-  font-size: 12px;
-  text-align: center;
-  padding: 2rem;
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  background: var(--bg); color: var(--muted); font-size: 12px; text-align: center; padding: 2rem;
 }
-
-#landing .big {
-  font-size: 48px;
-  line-height: 1;
-  user-select: none;
-}
-
-#landing .hint {
-  color: var(--border);
-  font-size: 11px;
-}
-
-#overlay-loading {
-  position: absolute;
-  inset: 0;
-  background: rgba(14,14,16,0.7);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--muted);
-  gap: 8px;
-  backdrop-filter: blur(2px);
-}
-
-#overlay-loading.active { display: flex; }
-
-.spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
+#landing .big { font-size: 48px; line-height: 1; user-select: none; }
+#landing .hint { color: var(--border); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -219,65 +124,65 @@ body {
 
 <div id="status-bar">
   <div id="status-dot"></div>
-  <span id="status-text">Initializing wisp transport...</span>
+  <span id="status-text">Initializing Scramjet...</span>
 </div>
 
 <div id="iframe-wrap">
   <div id="landing">
     <div class="big">&#127760;</div>
     <div>Enter a URL above to begin</div>
-    <div class="hint">Routes through epoxy/wisp, no service worker required</div>
+    <div class="hint">Powered by Scramjet + epoxy/wisp</div>
   </div>
-  <div id="overlay-loading">
-    <div class="spinner"></div>
-    <span id="overlay-text">Loading...</span>
-  </div>
-  <iframe id="proxy-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" style="display:none"></iframe>
+  <iframe id="proxy-frame" width="100%" style="display:none"></iframe>
 </div>
 
-<script>
-(function() {
-  const WISP_LIST_URL = 'https://cdn.jsdelivr.net/gh/lotsacookie/kstuff@main/Assets/json/wss.json';
-  const EPOXY_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-tls/+esm';
-  const REQUEST_TIMEOUT = 30000;
-  const MAX_REDIRECTS = 10;
+<script src="https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/scramjet.all.js"></script>
+<script type="module">
+import * as BareMux from "https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/index.mjs";
 
-  const urlInput = document.getElementById('url-input');
-  const goBtn = document.getElementById('go-btn');
-  const statusDot = document.getElementById('status-dot');
-  const statusText = document.getElementById('status-text');
-  const landing = document.getElementById('landing');
-  const overlayLoading = document.getElementById('overlay-loading');
-  const overlayText = document.getElementById('overlay-text');
-  const frame = document.getElementById('proxy-frame');
+const WISP_LIST_URL = "https://cdn.jsdelivr.net/gh/lotsacookie/kstuff@main/Assets/json/wss.json";
+const FALLBACK_WISP = "wss://gointospace.app/wisp/";
 
-  let epoxyClient = null;
-  let epoxyBindings = null;
-  let wispUrls = [];
-  let wispIndex = 0;
-  let loadGeneration = 0;
+const SW_SOURCE = `importScripts("https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/scramjet.all.js");
+const { ScramjetServiceWorker } = $scramjetLoadWorker();
+const scramjet = new ScramjetServiceWorker();
+async function handleRequest(event) {
+  await scramjet.loadConfig();
+  if (scramjet.route(event)) { return await scramjet.fetch(event); }
+  return await fetch(event.request);
+}
+self.addEventListener('fetch', (event) => { event.respondWith(handleRequest(event)); });`;
 
-  function setStatus(state, msg) {
-    statusDot.className = state;
-    statusText.textContent = msg;
+const BARE_WORKER_URL = "data:application/javascript;base64,IWZ1bmN0aW9uKCl7InVzZSBzdHJpY3QiO2NvbnN0IGU9TWVzc2FnZVBvcnQucHJvdG90eXBlLnBvc3RNZXNzYWdlO2xldCB0PW51bGw7ZnVuY3Rpb24gYShlLHQsYSl7Y29uc29sZS5lcnJvcihgZXJyb3Igd2hpbGUgcHJvY2Vzc2luZyAnJHthfSc6IGAsdCksZS5wb3N0TWVzc2FnZSh7dHlwZToiZXJyb3IiLGVycm9yOnR9KX1hc3luYyBmdW5jdGlvbiBuKGEsbixzKXtjb25zdCBvPWF3YWl0IHMucmVxdWVzdChuZXcgVVJMKGEuZmV0Y2gucmVtb3RlKSxhLmZldGNoLm1ldGhvZCxhLmZldGNoLmJvZHksYS5mZXRjaC5oZWFkZXJzLG51bGwpO2lmKCFmdW5jdGlvbigpe2lmKG51bGw9PT10KXtjb25zdCBhPW5ldyBNZXNzYWdlQ2hhbm5lbCxuPW5ldyBSZWFkYWJsZVN0cmVhbTtsZXQgczt0cnl7ZS5jYWxsKGEucG9ydDEsbixbbl0pLHM9ITB9Y2F0Y2goZSl7cz0hMX1yZXR1cm4gdD1zLHN9cmV0dXJuIHR9KCkmJm8uYm9keSBpbnN0YW5jZW9mIFJlYWRhYmxlU3RyZWFtKXtjb25zdCBlPW5ldyBSZXNwb25zZShvLmJvZHkpO28uYm9keT1hd2FpdCBlLmFycmF5QnVmZmVyKCl9by5ib2R5IGluc3RhbmNlb2YgUmVhZGFibGVTdHJlYW18fG8uYm9keSBpbnN0YW5jZW9mIEFycmF5QnVmZmVyP2UuY2FsbChuLHt0eXBlOiJmZXRjaCIsZmV0Y2g6b30sW28uYm9keV0pOmUuY2FsbChuLHt0eXBlOiJmZXRjaCIsZmV0Y2g6b30pfWxldCBzPW51bGwsbz0iIjtmdW5jdGlvbiBjKCl7cmV0dXJuIG5ldyBFcnJvcigidGhlcmUgYXJlIG5vIGJhcmUgY2xpZW50cyIse2NhdXNlOiJObyBCYXJlVHJhbnNwb3J0IHdhcyBzZXQuIFRyeSBjcmVhdGluZyBhIEJhcmVNdXhDb25uZWN0aW9uIGFuZCBjYWxsaW5nIHNldFRyYW5zcG9ydCgpIG9yIHNldE1hbnVhbFRyYW5zcG9ydCgpIG9uIGl0IGJlZm9yZSB1c2luZyBCYXJlQ2xpZW50LiJ9KX1mdW5jdGlvbiByKHQsYSl7Y29uc3Qgbj1zO2xldCBvPVthXTt0LmZldGNoPy5ib2R5JiZvLnB1c2godC5mZXRjaC5ib2R5KSx0LndlYnNvY2tldD8uY2hhbm5lbCYmby5wdXNoKHQud2Vic29ja2V0LmNoYW5uZWwpLGUuY2FsbChuLHttZXNzYWdlOnQscG9ydDphfSxvKX1mdW5jdGlvbiBsKHQpe3Qub25tZXNzYWdlPWFzeW5jIHQ9Pntjb25zdCBsPXQuZGF0YS5wb3J0LGk9dC5kYXRhLm1lc3NhZ2U7aWYoInBpbmciPT09aS50eXBlKWUuY2FsbChsLHt0eXBlOiJwb25nIn0pO2Vsc2UgaWYoInNldCI9PT1pLnR5cGUpdHJ5e2NvbnN0IHQ9YXN5bmMgZnVuY3Rpb24oKXt9LmNvbnN0cnVjdG9yO2lmKCJiYXJlLW11eC1yZW1vdGUiPT09aS5jbGllbnQuZnVuY3Rpb24pcz1pLmNsaWVudC5hcmdzWzBdLG89YGJhcmUtbXV4LXJlbW90ZSAoJHtpLmNsaWVudC5hcmdzWzFdfSlgO2Vsc2V7Y29uc3QgZT1uZXcgdChpLmNsaWVudC5mdW5jdGlvbiksW2Esbl09YXdhaXQgZSgpO3M9bmV3IGEoLi4uaS5jbGllbnQuYXJncyksbz1ufWNvbnNvbGUubG9nKCJzZXQgdHJhbnNwb3J0IHRvICIscyxvKSxlLmNhbGwobCx7dHlwZToic2V0In0pfWNhdGNoKGUpe2EobCxlLCJzZXQiKX1lbHNlIGlmKCJnZXQiPT09aS50eXBlKWwucG9zdE1lc3NhZ2Uoe3R5cGU6ImdldCIsbmFtZTpvfSk7ZWxzZSBpZigiZmV0Y2giPT09aS50eXBlKXRyeXtpZighcyl0aHJvdyBjKCk7aWYocyBpbnN0YW5jZW9mIE1lc3NhZ2VQb3J0KXJldHVybiB2b2lkIHIoaSxsKTtzLnJlYWR5fHxhd2FpdCBzLmluaXQoKSxhd2FpdCBuKGksbCxzKX1jYXRjaChlKXthKGwsZSwiZmV0Y2giKX1lbHNlIGlmKCJ3ZWJzb2NrZXQiPT09aS50eXBlKXRyeXtpZighcyl0aHJvdyBjKCk7aWYocyBpbnN0YW5jZW9mIE1lc3NhZ2VQb3J0KXJldHVybiB2b2lkIHIoaSxsKTtzLnJlYWR5fHxhd2FpdCBzLmluaXQoKSxhd2FpdCBhc3luYyBmdW5jdGlvbih0LGEsbil7Y29uc3RbcyxvXT1uLmNvbm5lY3QobmV3IFVSTCh0LndlYnNvY2tldC51cmwpLHQud2Vic29ja2V0LnByb3RvY29scyx0LndlYnNvY2tldC5yZXF1ZXN0SGVhZGVycywoYT0+e2UuY2FsbCh0LndlYnNvY2tldC5jaGFubmVsLHt0eXBlOiJvcGVuIixhcmdzOlthXX0pfSksKGE9PnthIGluc3RhbmNlb2YgQXJyYXlCdWZmZXI/ZS5jYWxsKHQud2Vic29ja2V0LmNoYW5uZWwse3R5cGU6Im1lc3NhZ2UiLGFyZ3M6W2FdfSxbYV0pOmUuY2FsbCh0LndlYnNvY2tldC5jaGFubmVsLHt0eXBlOiJtZXNzYWdlIixhcmdzOlthXX0pfSksKChhLG4pPT57ZS5jYWxsKHQud2Vic29ja2V0LmNoYW5uZWwse3R5cGU6ImNsb3NlIixhcmdzOlthLG5dfSl9KSwoYT0+e2UuY2FsbCh0LndlYnNvY2tldC5jaGFubmVsLHt0eXBlOiJlcnJvciIsYXJnczpbYV19KX0pKTt0LndlYnNvY2tldC5jaGFubmVsLm9ubWVzc2FnZT1lPT57ImRhdGEiPT09ZS5kYXRhLnR5cGU/cyhlLmRhdGEuZGF0YSk6ImNsb3NlIj09PWUuZGF0YS50eXBlJiZvKGUuZGF0YS5jbG9zZUNvZGUsZS5kYXRhLmNsb3NlUmVhc29uKX0sZS5jYWxsKGEse3R5cGU6IndlYnNvY2tldCJ9KX0oaSxsLHMpfWNhdGNoKGUpe2EobCxlLCJ3ZWJzb2NrZXQiKX19fW5ldyBCcm9hZGNhc3RDaGFubmVsKCJiYXJlLW11eCIpLnBvc3RNZXNzYWdlKHt0eXBlOiJyZWZyZXNoUG9ydCJ9KSxzZWxmLm9uY29ubmVjdD1lPT57bChlLnBvcnRzWzBdKX0sY29uc29sZS5kZWJ1ZygiYmFyZS1tdXg6IHJ1bm5pbmcgdjIuMS43IChidWlsZCBjNTZkMjg2KSIpfSgpOwovLyMgc291cmNlTWFwcGluZ1VSTD13b3JrZXIuanMubWFw";
+
+const urlInput = document.getElementById('url-input');
+const goBtn = document.getElementById('go-btn');
+const statusDot = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const landing = document.getElementById('landing');
+const frame = document.getElementById('proxy-frame');
+
+function setStatus(state, msg) {
+  statusDot.className = state;
+  statusText.textContent = msg;
+}
+
+function base64ToText(b64) {
+  const binary = atob(b64.trim());
+  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+function extractWispUrls(decoded) {
+  if (Array.isArray(decoded)) return decoded.map(x => (x || '').toString().trim()).filter(x => x.startsWith('wss://') || x.startsWith('ws://'));
+  if (decoded && typeof decoded === 'object') {
+    for (const v of Object.values(decoded)) { const f = extractWispUrls(v); if (f.length) return f; }
   }
+  return [];
+}
 
-  function base64ToText(b64) {
-    const binary = atob(b64.trim());
-    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-    return new TextDecoder('utf-8').decode(bytes);
-  }
-
-  function extractWispUrls(decoded) {
-    if (Array.isArray(decoded)) return decoded.map(x => (x||'').toString().trim()).filter(x => x.startsWith('wss://') || x.startsWith('ws://'));
-    if (decoded && typeof decoded === 'object') {
-      for (const v of Object.values(decoded)) { const f = extractWispUrls(v); if (f.length) return f; }
-    }
-    return [];
-  }
-
-  async function loadWispList() {
-    setStatus('loading', 'Fetching wisp server list...');
+async function getWispUrl() {
+  try {
     const r = await fetch(WISP_LIST_URL + '?nocache=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) throw new Error('wisp list HTTP ' + r.status);
     const outer = await r.json();
@@ -288,487 +193,80 @@ body {
     const decoded = JSON.parse(base64ToText(b64));
     const list = extractWispUrls(decoded);
     if (!list.length) throw new Error('no wss:// urls found');
-    return list;
+    return list[0];
+  } catch (e) {
+    console.warn('[proxy] falling back to default wisp server:', e.message);
+    return FALLBACK_WISP;
   }
+}
 
-  async function getEpoxyBindings() {
-    if (epoxyBindings) return epoxyBindings;
-    setStatus('loading', 'Loading epoxy transport...');
-    const mod = await import(EPOXY_MODULE_URL);
-    if (typeof mod.default === 'function') await mod.default();
-    if (!mod.EpoxyClient || !mod.EpoxyClientOptions) throw new Error('epoxy bindings missing');
-    epoxyBindings = mod;
-    return mod;
-  }
+let scramjet;
 
-  async function getClient() {
-    if (epoxyClient) return epoxyClient;
-    const server = wispUrls[wispIndex % wispUrls.length];
-    setStatus('loading', 'Connecting to ' + server + '...');
-    const { EpoxyClient, EpoxyClientOptions } = await getEpoxyBindings();
-    const opts = new EpoxyClientOptions();
-    opts.user_agent = navigator.userAgent;
-    epoxyClient = await new EpoxyClient(server, opts);
-    return epoxyClient;
-  }
+async function init() {
+  try {
+    setStatus('loading', 'Loading wisp server list...');
+    const wispUrl = await getWispUrl();
 
-  function resetClient() {
-    const old = epoxyClient;
-    epoxyClient = null;
-    wispIndex = (wispIndex + 1) % Math.max(1, wispUrls.length);
-    if (old) setTimeout(() => { try { old.free && old.free(); } catch(e){} }, 10000);
-  }
-
-  function withTimeout(p, ms) {
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('timeout after ' + ms + 'ms')), ms);
-      Promise.resolve(p).then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+    setStatus('loading', 'Setting up Scramjet controller...');
+    const { ScramjetController } = $scramjetLoadController();
+    scramjet = new ScramjetController({
+      files: {
+        wasm: "https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/wasm.wasm",
+        all: "https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/scramjet.all.js",
+        sync: "https://cdn.jsdelivr.net/gh/AerialiteLabs/tinyjet-frontend@latest/tinyjet/scramjet.sync.js"
+      }
     });
-  }
+    await scramjet.init();
 
-  async function wispRawFetch(url, opts) {
-    const client = await withTimeout(getClient(), 12000);
+    setStatus('loading', 'Registering service worker...');
+    const swBlob = new Blob([SW_SOURCE], { type: 'text/javascript' });
+    const swUrl = URL.createObjectURL(swBlob);
+    await navigator.serviceWorker.register(swUrl, { scope: './' });
+
+    setStatus('loading', 'Connecting bare-mux transport...');
+    const connection = new BareMux.BareMuxConnection(BARE_WORKER_URL);
+    await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport/dist/index.mjs", [{ wisp: wispUrl }]);
+
+    setStatus('ready', 'Ready — ' + wispUrl);
+  } catch (e) {
+    setStatus('error', 'Init failed: ' + e.message);
+    console.error('[proxy] init error:', e);
+  }
+}
+
+function loadUrl(raw) {
+  if (!scramjet) {
+    setStatus('error', 'Scramjet is not ready yet');
+    return;
+  }
+  let fixed = raw.trim();
+  try {
+    fixed = new URL(fixed).toString();
+  } catch (e) {
     try {
-      return await withTimeout(client.fetch(url, opts || {}), REQUEST_TIMEOUT);
-    } catch(e) {
-      if (/websocket|closed|reset|panic|wasm|not ready/i.test(e.message || '')) resetClient();
-      throw e;
-    }
-  }
-
-  async function wispFetchFollowingRedirects(url, opts) {
-    let currentUrl = url;
-    let currentOpts = opts || {};
-    for (let i = 0; i < MAX_REDIRECTS; i++) {
-      const resp = await wispRawFetch(currentUrl, currentOpts);
-      const status = resp.status;
-      if (status >= 300 && status < 400) {
-        const loc = resp.headers.get('location');
-        if (!loc) return { resp, finalUrl: currentUrl };
-        const nextUrl = new URL(loc, currentUrl).href;
-        if (status === 303 || ((status === 301 || status === 302) && currentOpts.method && currentOpts.method !== 'GET')) {
-          currentOpts = Object.assign({}, currentOpts, { method: 'GET', body: null });
-        }
-        currentUrl = nextUrl;
-        continue;
-      }
-      return { resp, finalUrl: currentUrl };
-    }
-    throw new Error('too many redirects');
-  }
-
-  async function wispFetchRaw(url, opts) {
-    const { resp, finalUrl } = await wispFetchFollowingRedirects(url, opts);
-    const buffer = await resp.arrayBuffer();
-    const headers = [];
-    resp.headers.forEach((v, k) => headers.push([k, v]));
-    return { status: resp.status, statusText: resp.statusText || '', headers, buffer, finalUrl };
-  }
-
-  function getHeader(headers, name) {
-    name = name.toLowerCase();
-    for (const [k, v] of headers) if (k.toLowerCase() === name) return v;
-    return '';
-  }
-
-  function absUrl(url, base) {
-    try { return new URL(url, base).href; } catch(e) { return null; }
-  }
-
-  function isSkippable(url) {
-    return !url || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(url.trim());
-  }
-
-  async function fetchAsBlobUrl(url, base) {
-    const target = absUrl(url, base);
-    if (!target) return url;
-    try {
-      const r = await wispFetchRaw(target, { method: 'GET' });
-      const type = getHeader(r.headers, 'content-type') || 'application/octet-stream';
-      const blob = new Blob([r.buffer], { type });
-      return URL.createObjectURL(blob);
-    } catch(e) {
-      return url;
-    }
-  }
-
-  async function processCss(cssText, base) {
-    const urls = new Set();
-    const urlRe = /url\(\s*(['"]?)([^)'"]+)\1\s*\)/g;
-    const importRe = /@import\s+(['"])([^'"]+)\1/g;
-    let m;
-    while ((m = urlRe.exec(cssText))) { if (!isSkippable(m[2])) urls.add(m[2]); }
-    while ((m = importRe.exec(cssText))) { if (!isSkippable(m[2])) urls.add(m[2]); }
-    const map = new Map();
-    await Promise.all([...urls].map(async u => {
-      const target = absUrl(u, base);
-      if (!target) return;
-      try {
-        const r = await wispFetchRaw(target, { method: 'GET' });
-        const ct = (getHeader(r.headers, 'content-type') || '').toLowerCase();
-        let bytesForBlob = r.buffer;
-        let type = ct || 'application/octet-stream';
-        if (ct.includes('text/css')) {
-          const text = new TextDecoder('utf-8').decode(r.buffer);
-          const rewritten = await processCss(text, target);
-          bytesForBlob = new TextEncoder().encode(rewritten);
-          type = 'text/css';
-        }
-        const blob = new Blob([bytesForBlob], { type });
-        map.set(u, URL.createObjectURL(blob));
-      } catch(e) {}
-    }));
-    let out = cssText.replace(urlRe, (m0, q, u) => map.has(u) ? ('url(' + q + map.get(u) + q + ')') : m0);
-    out = out.replace(importRe, (m0, q, u) => map.has(u) ? ('@import ' + q + map.get(u) + q) : m0);
-    return out;
-  }
-
-  function buildRuntimeScript() {
-    return '(function(){' +
-      'function toAbs(u){try{return new URL(u, document.baseURI).href;}catch(e){return u;}}' +
-      'function skip(u){return !u || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(u.trim());}' +
-      'async function bridgeFetch(url, opts){return await window.top.__scramFetch(url, opts || {});}' +
-      'async function toBlobUrl(url){' +
-        'if (skip(url)) return url;' +
-        'var u = toAbs(url);' +
-        'try{' +
-          'var r = await bridgeFetch(u, { method: "GET" });' +
-          'var type = "application/octet-stream";' +
-          'for (var i=0;i<r.headers.length;i++){ if (r.headers[i][0].toLowerCase()==="content-type") type = r.headers[i][1]; }' +
-          'var blob = new Blob([r.buffer], { type: type });' +
-          'return URL.createObjectURL(blob);' +
-        '}catch(e){ return url; }' +
-      '}' +
-      'var _fetch = window.fetch;' +
-      'window.fetch = async function(input, init){' +
-        'var url = typeof input === "string" ? input : (input && input.url);' +
-        'var method = (init && init.method) || (input && input.method) || "GET";' +
-        'var body = (init && init.body) || null;' +
-        'var abs = toAbs(url);' +
-        'var r = await bridgeFetch(abs, { method: method, headers: (init && init.headers) || {}, body: body });' +
-        'var headers = new Headers();' +
-        'for (var i=0;i<r.headers.length;i++){ try{ headers.append(r.headers[i][0], r.headers[i][1]); }catch(e){} }' +
-        'return new Response(r.buffer, { status: r.status, statusText: r.statusText, headers: headers });' +
-      '};' +
-      'function XHRShim(){ this._listeners = {}; this.readyState = 0; this.status = 0; this.response = null; this.responseText = ""; this.responseURL = ""; }' +
-      'XHRShim.prototype.open = function(method, url){ this._method = method; this._url = toAbs(url); };' +
-      'XHRShim.prototype.setRequestHeader = function(k,v){ this._headers = this._headers || {}; this._headers[k] = v; };' +
-      'XHRShim.prototype.addEventListener = function(type, fn){ this._listeners[type] = this._listeners[type] || []; this._listeners[type].push(fn); };' +
-      'XHRShim.prototype._fire = function(type){ var self=this; var fns = (this["on"+type] ? [this["on"+type]] : []).concat(this._listeners[type]||[]); fns.forEach(function(fn){ try{ fn.call(self, {target:self}); }catch(e){} }); };' +
-      'XHRShim.prototype.send = async function(body){' +
-        'try{' +
-          'var r = await bridgeFetch(this._url, { method: this._method, headers: this._headers||{}, body: body });' +
-          'this.status = r.status;' +
-          'this.responseURL = r.finalUrl || this._url;' +
-          'this.response = r.buffer;' +
-          'try{ this.responseText = new TextDecoder("utf-8").decode(r.buffer); }catch(e){ this.responseText=""; }' +
-          'this.readyState = 4;' +
-          'this._fire("readystatechange");' +
-          'this._fire("load");' +
-        '}catch(e){' +
-          'this.readyState = 4; this.status = 0;' +
-          'this._fire("readystatechange");' +
-          'this._fire("error");' +
-        '}' +
-      '};' +
-      'XHRShim.prototype.getAllResponseHeaders = function(){ return ""; };' +
-      'XHRShim.prototype.getResponseHeader = function(){ return null; };' +
-      'window.XMLHttpRequest = XHRShim;' +
-      'window.open = function(url){ var abs = toAbs(url); window.top.__scramNavigate(abs); return null; };' +
-      'async function convertAttr(el, attr){' +
-        'var val = el.getAttribute(attr);' +
-        'if (!val || skip(val)) return;' +
-        'if (el.tagName === "IFRAME" && attr === "src"){' +
-          'var abs = toAbs(val);' +
-          'try{' +
-            'var html = await window.top.__scramFetchText(abs);' +
-            'var rewritten = await window.top.__scramProcessHtml(html, abs);' +
-            'var blob = new Blob([rewritten], { type: "text/html" });' +
-            'el.setAttribute("src", URL.createObjectURL(blob));' +
-          '}catch(e){}' +
-          'return;' +
-        '}' +
-        'var blobUrl = await toBlobUrl(val);' +
-        'el.setAttribute(attr, blobUrl);' +
-      '}' +
-      'var _setAttribute = Element.prototype.setAttribute;' +
-      'Element.prototype.setAttribute = function(name, value){' +
-        'var n = String(name).toLowerCase();' +
-        'if ((n==="src"||n==="href"||n==="poster"||n==="data") && value && !skip(value) && String(value).indexOf("blob:")!==0){' +
-          'var tag = this.tagName;' +
-          'if (tag === "A" || tag === "FORM") return _setAttribute.call(this, name, value);' +
-          '_setAttribute.call(this, name, value);' +
-          'convertAttr(this, name);' +
-          'return;' +
-        '}' +
-        'return _setAttribute.call(this, name, value);' +
-      '};' +
-      '[["src", [window.HTMLImageElement, window.HTMLScriptElement, window.HTMLSourceElement, window.HTMLMediaElement, window.HTMLTrackElement, window.HTMLEmbedElement]], ["href", [window.HTMLLinkElement]]].forEach(function(pair){' +
-        'var prop = pair[0];' +
-        'pair[1].forEach(function(Ctor){' +
-          'if (!Ctor || !Ctor.prototype) return;' +
-          'var desc = Object.getOwnPropertyDescriptor(Ctor.prototype, prop);' +
-          'if (!desc || !desc.set) return;' +
-          'Object.defineProperty(Ctor.prototype, prop, {' +
-            'configurable: true, get: desc.get,' +
-            'set: function(value){' +
-              'if (!value || skip(value) || String(value).indexOf("blob:")===0) return desc.set.call(this, value);' +
-              'desc.set.call(this, value);' +
-              'toBlobUrl(value).then(function(bu){ desc.set.call(this, bu); }.bind(this));' +
-            '}' +
-          '});' +
-        '});' +
-      '});' +
-      'var iframeDesc = Object.getOwnPropertyDescriptor(window.HTMLIFrameElement.prototype, "src");' +
-      'if (iframeDesc && iframeDesc.set){' +
-        'Object.defineProperty(window.HTMLIFrameElement.prototype, "src", {' +
-          'configurable: true, get: iframeDesc.get,' +
-          'set: function(value){' +
-            'if (!value || skip(value) || String(value).indexOf("blob:")===0) return iframeDesc.set.call(this, value);' +
-            'var abs = toAbs(value);' +
-            'var self = this;' +
-            'window.top.__scramFetchText(abs).then(function(html){ return window.top.__scramProcessHtml(html, abs); }).then(function(rewritten){' +
-              'var blob = new Blob([rewritten], { type: "text/html" });' +
-              'iframeDesc.set.call(self, URL.createObjectURL(blob));' +
-            '}).catch(function(){ iframeDesc.set.call(self, value); });' +
-          '}' +
-        '});' +
-      '}' +
-      'document.addEventListener("click", function(e){' +
-        'var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;' +
-        'if (!a) return;' +
-        'var href = a.getAttribute("href");' +
-        'if (!href || /^(javascript:|#|mailto:|tel:)/i.test(href)) return;' +
-        'e.preventDefault();' +
-        'window.top.__scramNavigate(toAbs(href));' +
-      '}, true);' +
-      'document.addEventListener("submit", function(e){' +
-        'var f = e.target;' +
-        'if (!f || f.tagName !== "FORM") return;' +
-        'e.preventDefault();' +
-        'var action = toAbs(f.getAttribute("action") || document.baseURI);' +
-        'var method = (f.getAttribute("method") || "GET").toUpperCase();' +
-        'if (method === "GET"){' +
-          'var params = new URLSearchParams(new FormData(f));' +
-          'var url = action + (action.indexOf("?")>=0?"&":"?") + params.toString();' +
-          'window.top.__scramNavigate(url);' +
-        '} else {' +
-          'var fd = new FormData(f);' +
-          'window.top.__scramNavigate(action, method, fd);' +
-        '}' +
-      '}, true);' +
-    '})();';
-  }
-
-  async function processHtml(html, baseUrl) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-
-    doc.querySelectorAll('base').forEach(b => b.remove());
-    const baseEl = doc.createElement('base');
-    baseEl.setAttribute('href', new URL('.', baseUrl).href);
-    if (doc.head) doc.head.insertBefore(baseEl, doc.head.firstChild);
-
-    doc.querySelectorAll('meta[http-equiv]').forEach(meta => {
-      if ((meta.getAttribute('http-equiv') || '').toLowerCase() === 'refresh') {
-        const content = meta.getAttribute('content') || '';
-        const m = content.match(/^\s*(\d+)\s*;\s*url=(.+)$/i);
-        if (m) {
-          const delay = parseInt(m[1], 10) * 1000;
-          const target = absUrl(m[2].trim().replace(/^['"]|['"]$/g, ''), baseUrl);
-          meta.remove();
-          if (target && doc.head) {
-            const s = doc.createElement('script');
-            s.textContent = 'setTimeout(function(){ window.top.__scramNavigate(' + JSON.stringify(target) + '); }, ' + delay + ');';
-            doc.head.appendChild(s);
-          }
-        }
-      }
-    });
-
-    const fetchJobs = [];
-
-    doc.querySelectorAll('img[src], source[src], video[src], audio[src], track[src], embed[src]').forEach(el => {
-      const val = el.getAttribute('src');
-      if (isSkippable(val)) return;
-      fetchJobs.push(fetchAsBlobUrl(val, baseUrl).then(bu => el.setAttribute('src', bu)));
-    });
-
-    doc.querySelectorAll('object[data]').forEach(el => {
-      const val = el.getAttribute('data');
-      if (isSkippable(val)) return;
-      fetchJobs.push(fetchAsBlobUrl(val, baseUrl).then(bu => el.setAttribute('data', bu)));
-    });
-
-    doc.querySelectorAll('[srcset]').forEach(el => {
-      const val = el.getAttribute('srcset');
-      if (!val) return;
-      const parts = val.split(',').map(p => p.trim());
-      fetchJobs.push(Promise.all(parts.map(async p => {
-        const m = p.match(/^(\S+)(\s+.*)?$/);
-        if (!m) return p;
-        const bu = await fetchAsBlobUrl(m[1], baseUrl);
-        return bu + (m[2] || '');
-      })).then(rewritten => el.setAttribute('srcset', rewritten.join(', '))));
-    });
-
-    doc.querySelectorAll('script[src]').forEach(el => {
-      const val = el.getAttribute('src');
-      if (isSkippable(val)) return;
-      fetchJobs.push(fetchAsBlobUrl(val, baseUrl).then(bu => el.setAttribute('src', bu)));
-    });
-
-    doc.querySelectorAll('link[href]').forEach(el => {
-      const val = el.getAttribute('href');
-      const rel = (el.getAttribute('rel') || '').toLowerCase();
-      if (isSkippable(val)) return;
-      if (rel.includes('stylesheet')) {
-        fetchJobs.push((async () => {
-          const target = absUrl(val, baseUrl);
-          try {
-            const r = await wispFetchRaw(target, { method: 'GET' });
-            const text = new TextDecoder('utf-8').decode(r.buffer);
-            const rewritten = await processCss(text, target);
-            const blob = new Blob([rewritten], { type: 'text/css' });
-            el.setAttribute('href', URL.createObjectURL(blob));
-          } catch(e) {}
-        })());
-      } else {
-        fetchJobs.push(fetchAsBlobUrl(val, baseUrl).then(bu => el.setAttribute('href', bu)));
-      }
-    });
-
-    doc.querySelectorAll('style').forEach(el => {
-      fetchJobs.push(processCss(el.textContent || '', baseUrl).then(rewritten => { el.textContent = rewritten; }));
-    });
-
-    doc.querySelectorAll('[style]').forEach(el => {
-      const val = el.getAttribute('style');
-      if (val && val.includes('url(')) {
-        fetchJobs.push(processCss(val, baseUrl).then(rewritten => el.setAttribute('style', rewritten)));
-      }
-    });
-
-    doc.querySelectorAll('iframe[src]').forEach(el => {
-      const val = el.getAttribute('src');
-      if (isSkippable(val)) return;
-      fetchJobs.push((async () => {
-        const target = absUrl(val, baseUrl);
-        try {
-          const r = await wispFetchRaw(target, { method: 'GET' });
-          const nestedHtml = new TextDecoder('utf-8').decode(r.buffer);
-          const rewritten = await processHtml(nestedHtml, r.finalUrl);
-          const blob = new Blob([rewritten], { type: 'text/html' });
-          el.setAttribute('src', URL.createObjectURL(blob));
-        } catch(e) {}
-      })());
-    });
-
-    await Promise.all(fetchJobs);
-
-    const script = doc.createElement('script');
-    script.textContent = buildRuntimeScript();
-    if (doc.head) doc.head.appendChild(script);
-    else doc.documentElement.appendChild(script);
-
-    return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
-  }
-
-  window.__scramFetch = async function(url, opts) {
-    return await wispFetchRaw(url, opts || {});
-  };
-
-  window.__scramFetchText = async function(url) {
-    const r = await wispFetchRaw(url, { method: 'GET' });
-    return new TextDecoder('utf-8').decode(r.buffer);
-  };
-
-  window.__scramProcessHtml = async function(html, baseUrl) {
-    return await processHtml(html, baseUrl);
-  };
-
-  window.__scramNavigate = async function(url, method, body) {
-    await loadUrl(url, method, body);
-  };
-
-  async function loadUrl(rawUrl, method, body) {
-    let url;
-    try {
-      if (!/^https?:\/\//i.test(rawUrl)) rawUrl = 'https://' + rawUrl;
-      url = new URL(rawUrl);
-    } catch(e) {
+      const u = new URL('https://' + fixed);
+      if (!u.hostname.includes('.')) throw new Error('not a url');
+      fixed = u.toString();
+    } catch (e2) {
       setStatus('error', 'Invalid URL');
       return;
     }
-
-    const gen = ++loadGeneration;
-    urlInput.value = url.href;
-    landing.style.display = 'none';
-    overlayLoading.classList.add('active');
-    overlayText.textContent = 'Fetching ' + url.hostname + '...';
-    goBtn.disabled = true;
-    setStatus('loading', 'Fetching ' + url.href);
-    frame.style.display = 'block';
-
-    const stale = () => gen !== loadGeneration;
-
-    try {
-      const opts = { method: method || 'GET' };
-      if (body) opts.body = body;
-      const r = await withTimeout(wispFetchRaw(url.href, opts), REQUEST_TIMEOUT * 2);
-      if (stale()) return;
-
-      const html = new TextDecoder('utf-8').decode(r.buffer);
-      if (stale()) return;
-
-      setStatus('loading', 'Rewriting resources for ' + url.hostname + '...');
-      const rewritten = await processHtml(html, r.finalUrl);
-      if (stale()) return;
-
-      const doc = frame.contentDocument;
-      if (!doc) throw new Error('iframe document unavailable');
-
-      doc.open();
-      doc.write(rewritten);
-      doc.close();
-
-      setStatus('ready', r.finalUrl);
-      overlayLoading.classList.remove('active');
-    } catch(e) {
-      if (stale()) return;
-      setStatus('error', 'Error: ' + e.message);
-      overlayLoading.classList.remove('active');
-      const doc = frame.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write('<html><body style="font-family:monospace;padding:2rem;background:#0e0e10;color:#f87171"><h2>Proxy Error</h2><p>' + e.message + '</p></body></html>');
-        doc.close();
-      }
-    } finally {
-      if (!stale()) goBtn.disabled = false;
-    }
   }
+  landing.style.display = 'none';
+  frame.style.display = 'block';
+  setStatus('loading', 'Loading ' + fixed + '...');
+  frame.src = scramjet.encodeUrl(fixed);
+  urlInput.value = fixed;
+  setStatus('ready', fixed);
+}
 
-  document.getElementById('url-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const val = urlInput.value.trim();
-    if (val) loadUrl(val);
-  });
+document.getElementById('url-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const val = urlInput.value.trim();
+  if (val) loadUrl(val);
+});
 
-  async function init() {
-    try {
-      wispUrls = await loadWispList();
-      setStatus('loading', 'Connecting to wisp: ' + (wispUrls[0] || '?'));
-      await getClient();
-      setStatus('ready', 'Ready — ' + wispUrls[wispIndex % wispUrls.length]);
-    } catch(e) {
-      setStatus('error', 'Init failed: ' + e.message);
-      console.error('[proxy] init error:', e);
-    }
-  }
-
-  init();
-})();
+init();
 </script>
 </body>
 </html>
